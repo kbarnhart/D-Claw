@@ -1563,6 +1563,17 @@ class DigclawInputData(Data):
             "percentage of max momentum for autostop, default is 0.05 (5%)",
         )
 
+        self.add_attribute(
+            "fric_offset_val",
+            0.,
+            "Friction offset value for Rocha and Gray frictional hysteresis, default is 0",
+        )
+        self.add_attribute(
+            "fric_star_val",
+            0.,
+            "Frictional star value for Rocha and Gray frictional hysteresis, default is zero",
+        )
+
     def write(self):
 
         print("Creating data file setdig.data")
@@ -1613,6 +1624,19 @@ class DigclawInputData(Data):
             self,
             "mom_perc",
             "percentage of max momentum for autostop, default is 0.05 (5%)",
+        )
+
+        data_write(
+            file,
+            self,
+            "fric_offset_val",
+            "Friction offset value for Rocha and Gray frictional hysteresis, default is 0",
+        )
+        data_write(
+            file,
+            self,
+            "fric_star_val",
+            "Frictional star value for Rocha and Gray frictional hysteresis, default is zero",
         )
 
         file.close()

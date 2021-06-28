@@ -21,11 +21,17 @@
       double precision :: vnorm,hvnorm,theta,dtheta,w,taucf,fsphi,hvnorm0
       double precision :: shear,sigebar,pmtanh01,rho_fp,seg
       double precision :: b_xx,b_yy,b_xy,chi,beta
+      double precision :: slope_xy
       double precision :: t1bot,t2top,beta2,dh,rho2,prat,b_x,b_y,dbdv
       double precision :: vlow,m2,vreg,slopebound
       double precision :: b_eroded,b_remaining,dtcoeff
       integer :: i,j,ii,jj,jjend,icount,curvature
       logical :: ent
+
+      !RPJ
+      double precision :: phi1f,phi2f,phi3f,Frf,Fr_starf,betaf,Lambdaf, Lf,Gamf,diamf
+      double precision :: mu_df,mu_sf,mu_bf,PIf,mu1f,mu2f,mu3f,viscf
+
 
       double precision, allocatable :: moll(:,:)
 
@@ -80,7 +86,68 @@
             hvnorm = sqrt(hu**2.0 + hv**2.0)
             hvnorm0 = hvnorm
 
+
+            !friction from granular material based on h_start and h_stop
+            !based on Rocha and Gray, JFM 2019
+            !! for now let h_stop be h_start - 10 deg, h_start = h_stop + 2 deg
+            ! Other values are for sand
+
+            !degrees
+            phi2f = phi
+            phi1f = phi2f - fric_offset_val*PIf/180.d0
+            phi3f = phi1f + fric_star_val*PIf/180.d0
+
+            b_x = (aux(i+1,j,1)+q(i+1,j,7)-aux(i-1,j,1)-q(i-1,j,7))/(2.d0*dx) ! z/x
+            b_y = (aux(i,j+1,1)+q(i,j+1,7)-aux(i,j-1,1)-q(i,j-1,7))/(2.d0*dy) ! z/y
+
+            b_xy = abs(b_x*u/vnorm) + abs(b_y*v/vnorm)
+            slope_xy = atan(b_xy)
+
+            PIf = 4.D0*ATAN(1.D0)
+            mu1f = tan(phi1f)
+            mu2f = tan(phi2f)
+            mu3f = tan(phi3f)
+
+            Lambdaf = 1.34d0
+            diamf = 0.1
+            Lf = 2.d0 * diamf
+            betaf = 0.65d0 / sqrt(cos(slope_xy))
+            Gamf = 0.77d0 / sqrt(cos(slope_xy))
+            Fr_starf = Lambdaf * betaf - Gamf
+
+            !Local Froude number
+            Frf = vnorm / sqrt(gmod*h*cos(slope_xy))
+            mu_df = mu1f + (mu2f - mu1f) / (1 + h * betaf / (Lf * (Frf + Gamf)))
+            if (Frf >= Fr_starf) then ! mu_dynamic
+               mu_bf = mu_df
+               goto 456
+            endif
+            mu_sf = mu3f + (mu2f - mu1f) / (1 + h/Lf)
+            if (Frf < 1.e-16) then ! mu_static
+               mu_bf = mu_sf
+               goto 456
+            endif
+
+            !mu_intermediate
+            mu_bf = (Frf/Fr_starf) * (mu_df - mu_sf) + mu_sf
+            goto 456
+
+   456      continue
+            ! convert friction coefficient to tau
+            ! F = mu N = tau / h
+            ! do we assume tau is per unit area or calculate specific for cell?
+            !!!tau = gmod * mu_bf * rho_s * h**2.0
+            !!!tau = gmod * mu_bf * rho_s * h**2.0 * dx*dy
+            !mu = tanphi ?
+            !!!tau = sigbed*mu_bf
+            !!!tau = sigbed*tan(atan(mu_bf)+atan(tanpsi))
+            tau = (m/m_crit)*sigbed*tan(atan(mu_bf)+atan(tanpsi))
+
+            ! viscosity (depth averaged is vh^(1/2)/2)
+            viscf = (m/m_crit)*(2*Lf*sqrt(grav)*sin(theta))/(9*betaf*sqrt(cos(theta)))*((mu2f - tan(theta))/(tan(theta)-mu1f))
+
             !integrate friction
+            !!hvnorm = dmax1(0.d0,(hvnorm - dti*tau/rho)*exp(-2.0d0*viscf*dti/(rho_s*h**2.0)))
             hvnorm = dmax1(0.d0,hvnorm - dti*tau/rho)
             hvnorm = hvnorm*exp(-(1.d0-m)*2.0d0*mu*dti/(rho*h**2.0))
             !hvnorm = hvnorm*exp(-(1.d0-m)*2.0d0*0.1*dti/(rho*h**2.0))
@@ -109,7 +176,7 @@
             call admissibleq(h,hu,hv,hm,p,u,v,m,theta)
             call auxeval(h,u,v,m,p,phi,theta,kappa,S,rho,tanpsi,D,tau,sigbed,kperm,compress,pm)
 
-            
+
             vnorm = sqrt(u**2.0 + v**2.0)
 
             !integrate shear-induced dilatancy
@@ -135,7 +202,7 @@
       		endif
             !pmtanh01 = seg*(0.5*(tanh(20.0*(pm-0.80))+1.0))
             !pmtanh01 = seg*(0.5*(tanh(40.0*(pm-0.90))+1.0))
-            
+
             !integrate pressure relaxation
             !if (compress<1.d15) then !elasticity is = 0.0 but compress is given 1d16 in auxeval
             !   zeta = 3.d0/(compress*h*2.0)  + (rho-rho_fp)*rho_fp*gmod/(4.d0*rho)
@@ -163,7 +230,7 @@
 
             call admissibleq(h,hu,hv,hm,p,u,v,m,theta)
             call auxeval(h,u,v,m,p,phi,theta,kappa,S,rho,tanpsi,D,tau,sigbed,kperm,compress,pm)
-            
+
 
             krate = D*(rho-rho_fp)/rho
             hu = hu*exp(dti*krate/h)
@@ -177,7 +244,7 @@
             call auxeval(h,u,v,m,p,phi,theta,kappa,S,rho,tanpsi,D,tau,sigbed,kperm,compress,pm)
 
             !======================mass entrainment===========================
-            
+
             vnorm = sqrt(u**2.0 + v**2.0)
             vlow = 0.1d0
 

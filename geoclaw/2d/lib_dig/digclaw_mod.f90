@@ -31,6 +31,7 @@ module digclaw_module
     integer :: init_ptype,p_initialized,bed_normal,entrainment
     double precision :: init_pmax_ratio,init_ptf2,init_ptf,init_pmin_ratio
     double precision :: grad_eta_max,cohesion_max,grad_eta_ave,eta_cell_count
+    double precision :: fric_offset_val, fric_star_val
 
     integer, parameter ::  i_dig    = 4 !Start of digclaw aux variables
     integer, parameter ::  i_phi    = i_dig
@@ -99,6 +100,8 @@ contains
          read(iunit,*) entrainment_rate
          read(iunit,*) mom_autostop
          read(iunit,*) mom_perc
+         read(iunit,*) fric_offset_val
+         read(iunit,*) fric_star_val
 
          close(iunit)
          alpha_seg = 1.0 - alpha_seg
@@ -128,6 +131,8 @@ contains
          write(DIG_PARM_UNIT,*) '    entrainment_rate:', entrainment_rate
          write(DIG_PARM_UNIT,*) '    mom_autostop:', mom_autostop
          write(DIG_PARM_UNIT,*) '    mom_perc:', mom_perc
+         write(DIG_PARM_UNIT,*) '    fric_offset_val:', fric_offset_val
+         write(DIG_PARM_UNIT,*) '    fric_star_val:', fric_star_val
 
    end subroutine set_dig
 
